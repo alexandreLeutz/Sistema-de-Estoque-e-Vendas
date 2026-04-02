@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Estoque e Vendas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .active-tab { border-bottom: 4px solid #3b82f6; color: #3b82f6; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <nav class="bg-white shadow-md mb-6">
+        <div class="max-w-4xl mx-auto flex">
+            <button onclick="switchTab('cadastro')" id="tab-cadastro" class="flex-1 py-4 font-bold text-gray-600 active-tab">CADASTRO DE PRODUTOS</button>
+            <button onclick="switchTab('vendas')" id="tab-vendas" class="flex-1 py-4 font-bold text-gray-600">VENDA</button>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto p-4">
+
+        <section id="sec-cadastro">
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h2 class="text-xl font-bold mb-4">Novo Produto</h2>
+                <form id="product-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="nome" placeholder="Nome do Produto" class="border p-2 rounded" required>
+                    <input type="number" id="preco" placeholder="Preço (R$)" step="0.01" class="border p-2 rounded" required>
+                    <input type="number" id="estoque" placeholder="Qtd em Estoque" class="border p-2 rounded" required>
+                    <input type="file" id="foto" accept="image/*" class="border p-2 rounded">
+                    <textarea id="descricao" placeholder="Descrição" class="border p-2 rounded md:col-span-2"></textarea>
+                    <button type="submit" class="bg-green-500 text-white font-bold py-2 rounded hover:bg-green-600 md:col-span-2">SALVAR PRODUTO</button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-4">Produtos Cadastrados</h2>
+                <div id="lista-produtos" class="grid grid-cols-1 gap-4">
+                    </div>
+            </div>
+        </section>
+
+        <section id="sec-vendas" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-2">
+                    <h2 class="text-xl font-bold mb-4">Escolha o Produto</h2>
+                    <div id="vitrine-vendas" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md h-fit">
+                    <h2 class="text-xl font-bold mb-4">Checkout (Cartão)</h2>
+                    <div id="carrinho-info" class="mb-4 p-2 bg-blue-50 rounded text-blue-800 italic">Selecione um produto</div>
+                    <div class="space-y-3">
+                        <input type="text" placeholder="Número do Cartão (Simulado)" class="w-full border p-2 rounded" maxlength="16">
+                        <div class="flex gap-2">
+                            <input type="text" placeholder="Validade" class="w-1/2 border p-2 rounded">
+                            <input type="text" placeholder="CVV" class="w-1/2 border p-2 rounded">
+                        </div>
+                        <button onclick="finalizarVenda()" class="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-700">PAGAR AGORA</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let produtos = JSON.parse(localStorage.getItem('produtos')) || [];
+        let produtoSelecionado = null;
+
+        // --- LÓGICA DE NAVEGAÇÃO ---
+        function switchTab(tab) {
+            document.getElementById('sec-cadastro').classList.toggle('hidden', tab !== 'cadastro');
+            document.getElementById('sec-vendas').classList.toggle('hidden', tab !== 'vendas');
+            document.getElementById('tab-cadastro').classList.toggle('active-tab', tab === 'cadastro');
+            document.getElementById('tab-vendas').classList.toggle('active-tab', tab === 'vendas');
+            renderizar();
+        }
+
+        // --- LÓGICA DE PRODUTOS (CRUD) ---
+        document.getElementById('product-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fotoFile = document.getElementById('foto').files[0];
+            let fotoBase64 = "https://via.placeholder.com/150";
+
+            if (fotoFile) {
+                fotoBase64 = await toBase64(fotoFile);
+            }
+
+            const novoProd = {
+                id: Date.now(),
+                nome: document.getElementById('nome').value,
+                preco: parseFloat(document.getElementById('preco').value),
+                estoque: parseInt(document.getElementById('estoque').value),
+                descricao: document.getElementById('descricao').value,
+                foto: fotoBase64
+            };
+
+            produtos.push(novoProd);
+            salvar();
+            e.target.reset();
+            renderizar();
+        });
+
+        const toBase64 = file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+
+        function excluirProduto(id) {
+            produtos = produtos.filter(p => p.id !== id);
+            salvar();
+            renderizar();
+        }
+
+        function salvar() {
+            localStorage.setItem('produtos', JSON.stringify(produtos));
+        }
+
+        // --- LÓGICA DE VENDAS ---
+        function selecionarParaVenda(id) {
+            produtoSelecionado = produtos.find(p => p.id === id);
+            const info = document.getElementById('carrinho-info');
+            if (produtoSelecionado.estoque > 0) {
+                info.innerHTML = `🛒 <strong>${produtoSelecionado.nome}</strong><br>Total: R$ ${produtoSelecionado.preco.toFixed(2)}`;
+                info.className = "mb-4 p-2 bg-green-50 rounded text-green-800";
+            } else {
+                alert("Produto sem estoque!");
+                produtoSelecionado = null;
+            }
+        }
+
+        function finalizarVenda() {
+            if (!produtoSelecionado) return alert("Selecione um produto primeiro!");
+
+            // Simulação de baixa no estoque
+            const index = produtos.findIndex(p => p.id === produtoSelecionado.id);
+            if (produtos[index].estoque > 0) {
+                produtos[index].estoque -= 1;
+                salvar();
+                alert(`Venda de ${produtoSelecionado.nome} aprovada no cartão!`);
+                produtoSelecionado = null;
+                document.getElementById('carrinho-info').innerHTML = "Selecione um produto";
+                renderizar();
+            }
+        }
+
+        // --- RENDERIZAÇÃO ---
+        function renderizar() {
+            const lista = document.getElementById('lista-produtos');
+            const vitrine = document.getElementById('vitrine-vendas');
+            lista.innerHTML = '';
+            vitrine.innerHTML = '';
+
+            produtos.forEach(p => {
+                // Template para Lista de Cadastro
+                lista.innerHTML += `
+                    <div class="flex items-center gap-4 border-b pb-4">
+                        <img src="${p.foto}" class="w-16 h-16 object-cover rounded">
+                        <div class="flex-1">
+                            <h3 class="font-bold">${p.nome}</h3>
+                            <p class="text-sm text-gray-500">${p.descricao}</p>
+                            <span class="text-green-600 font-bold">R$ ${p.preco.toFixed(2)}</span> |
+                            <span class="text-gray-600">Estoque: ${p.estoque}</span>
+                        </div>
+                        <button onclick="excluirProduto(${p.id})" class="text-red-500 font-bold">EXCLUIR</button>
+                    </div>
+                `;
+
+                // Template para Vitrine de Vendas
+                vitrine.innerHTML += `
+                    <div onclick="selecionarParaVenda(${p.id})" class="bg-white p-4 rounded-lg shadow cursor-pointer hover:ring-2 hover:ring-blue-400 transition">
+                        <img src="${p.foto}" class="w-full h-32 object-cover rounded mb-2">
+                        <h3 class="font-bold">${p.nome}</h3>
+                        <p class="text-blue-600 font-bold">R$ ${p.preco.toFixed(2)}</p>
+                        <p class="text-xs ${p.estoque > 0 ? 'text-gray-500' : 'text-red-500'}">Disponível: ${p.estoque}</p>
+                    </div>
+                `;
+            });
+        }
+
+        renderizar();
+    </script>
+</body>
+</html>
